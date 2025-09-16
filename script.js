@@ -206,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const titleText = title.getAttribute('aria-label') || "NO, I'M NOT A HUMAN";
         typeText(prompt, "Are you a human?").then(() => { yesBtn.disabled = false; });
         yesBtn.addEventListener('click', async () => {
+            yesBtn.style.display = 'none'; // Hide button immediately on click
             prompt.classList.add('fade');
             setupAudio();
             scheduleNextKnock();
@@ -230,14 +231,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function playKnock() {
-        if (knockBuffers.length === 0) return;
-        const randomIndex = Math.floor(Math.random() * knockBuffers.length);
-        const audio = new Audio(URL.createObjectURL(new Blob([knockBuffers[randomIndex]], { type: 'audio/mpeg' })));
-        audio.play().catch(e => console.error("Could not play knock sound:", e));
+        if (!audioUnlocked || knockBuffers.length === 0) return;
+        
+        try {
+            const source = audioCtx.createBufferSource();
+            const randomIndex = Math.floor(Math.random() * knockBuffers.length);
+            source.buffer = knockBuffers[randomIndex];
+            source.connect(audioCtx.destination);
+            source.start(0);
+        } catch (e) {
+            console.error("Could not play knock sound:", e);
+        }
     }
 
     function scheduleNextKnock() {
-        const randomInterval = Math.random() * (20000 - 7000) + 7000; // between 7 and 20 seconds
+        const randomInterval = Math.random() * (10000 - 3000) + 3000; // between 3 and 10 seconds
         setTimeout(() => {
             playKnock();
             scheduleNextKnock(); // schedule the next one
