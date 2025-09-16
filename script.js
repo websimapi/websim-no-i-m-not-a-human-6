@@ -1,31 +1,55 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Script loaded and running.");
     const AUDIO_DURATION = 95, FADE = 15, FADE_OUT_START = 80;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let audioUnlocked = false;
+    let backgroundAudioElement;
+
+    const knockSoundUrls = ['knock.mp3', 'knock_2.mp3', 'knock_3.mp3', 'knock_4.mp3'];
+    let knockBuffers = [];
+
+    async function loadKnockSounds() {
+        for (const url of knockSoundUrls) {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                knockBuffers.push(audioBuffer);
+            } catch (e) {
+                console.error(`Failed to load or decode knock sound: ${url}`, e);
+            }
+        }
+    }
 
     function setupAudio() {
+        if (backgroundAudioElement) return; // Already setup
         const audio = new Audio('Fleshy Decay - Sonauto.ai.ogg');
+        backgroundAudioElement = audio;
         audio.loop = false; audio.preload = 'auto';
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        const ctx = new Ctx(); const src = ctx.createMediaElementSource(audio);
-        const gain = ctx.createGain(); gain.gain.value = 0;
-        src.connect(gain).connect(ctx.destination);
+        
+        const src = audioCtx.createMediaElementSource(audio);
+        const gain = audioCtx.createGain(); gain.gain.value = 0;
+        src.connect(gain).connect(audioCtx.destination);
 
         const apply = () => {
             const t = audio.currentTime; let g = 1;
             if (t < FADE) g = t / FADE;
             else if (t >= FADE_OUT_START) g = Math.max(0, (AUDIO_DURATION - t) / FADE);
-            gain.gain.setTargetAtTime(g, ctx.currentTime, 0.05);
+            gain.gain.setTargetAtTime(g, audioCtx.currentTime, 0.05);
         };
         audio.addEventListener('timeupdate', apply);
         audio.addEventListener('seeked', apply);
 
         audio.addEventListener('ended', () => { audio.currentTime = 0; audio.play(); });
-        const unlockBtn = document.getElementById('audio-unlock');
-        const tryPlay = () => audio.play().catch(() => { unlockBtn.hidden = false; });
-        tryPlay();
-        unlockBtn?.addEventListener('click', async () => {
-            unlockBtn.hidden = true; if (ctx.state === 'suspended') await ctx.resume(); tryPlay();
-        });
+        audio.play().catch(e => console.error("Background audio play failed:", e));
+    }
+
+    async function unlockAudio() {
+        if (audioUnlocked) return;
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+        audioUnlocked = true;
     }
 
     function adjustLayout() {
@@ -205,12 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { once: true });
     }
 
-    const knockSound = new Audio('knock.mp3');
-    knockSound.preload = 'auto';
-
     function playKnock() {
-        knockSound.currentTime = 0;
-        knockSound.play().catch(e => console.error("Could not play knock sound:", e));
+        if (knockBuffers.length === 0) return;
+        const randomIndex = Math.floor(Math.random() * knockBuffers.length);
+        const audio = new Audio(URL.createObjectURL(new Blob([knockBuffers[randomIndex]], { type: 'audio/mpeg' })));
+        audio.play().catch(e => console.error("Could not play knock sound:", e));
     }
 
     function scheduleNextKnock() {
@@ -233,4 +256,5 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBackgroundDrip();
     });
     initOverlayFlow();
+    loadKnockSounds();
 });
