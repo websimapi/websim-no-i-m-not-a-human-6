@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
         yesBtn.addEventListener('click', async () => {
             yesBtn.style.display = 'none'; // Hide button immediately on click
             prompt.classList.add('fade');
+            await unlockAudio();
             setupAudio();
             scheduleNextKnock();
             title.textContent = '';
